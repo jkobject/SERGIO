@@ -6,13 +6,13 @@ import csv
 import networkx as nx
 from scipy.stats import wasserstein_distance
 
-class sergio (object):
+class sergio:
 
-    def __init__(self,number_genes, number_bins, number_sc, noise_params,\
-    noise_type, decays, dynamics = False, sampling_state = 10, tol = 1e-3,\
-    window_length = 100, dt = 0.01, optimize_sampling = False,\
-    bifurcation_matrix = None, noise_params_splice = None, noise_type_splice = None,\
-    splice_ratio = 4, dt_splice = 0.01, migration_rate = None):
+    def __init__(self, number_genes, number_bins, number_sc, noise_params,
+                 noise_type, decays, dynamics=False, sampling_state=10, tol=1e-3,
+                 window_length=100, dt=0.01, optimize_sampling=False,
+                 bifurcation_matrix=None, noise_params_splice=None, noise_type_splice=None,
+                 splice_ratio=4, dt_splice=0.01, migration_rate=None):
         """
         Noise is a gaussian white noise process with zero mean and finite variance.
         noise_params: The amplitude of noise in CLE. This can be a scalar to use
@@ -155,7 +155,7 @@ class sergio (object):
             reader = csv.reader(f, delimiter=',')
             if (shared_coop_state <= 0):
                 for row in reader:
-                    nRegs = np.int(row[1])
+                    nRegs = int(float(row[1]))
                     ##################### Raise Error ##########################
                     if nRegs == 0:
                         print ("Error: a master regulator (#Regs = 0) appeared in input")
@@ -165,22 +165,22 @@ class sergio (object):
                     currInteraction = []
                     currParents = []
                     for regId, K, C_state in zip(row[2: 2 + nRegs], row[2+nRegs : 2+2*nRegs], row[2+2*nRegs : 2+3*nRegs]):
-                        currInteraction.append((np.int(regId), np.float(K), np.float(C_state), 0)) # last zero shows half-response, it is modified in another method
-                        allRegs.append(np.int(regId))
-                        currParents.append(np.int(regId))
-                        self.graph_[np.int(regId)]['targets'].append(np.int(row[0]))
+                        currInteraction.append((int(float(regId)), float(K), float(C_state), 0)) # last zero shows half-response, it is modified in another method
+                        allRegs.append(int(float(regId)))
+                        currParents.append(int(float(regId)))
+                        self.graph_[int(float(regId))]['targets'].append(int(float(row[0])))
 
-                    self.graph_[np.int(row[0])]['params'] = currInteraction
-                    self.graph_[np.int(row[0])]['regs'] = currParents
-                    self.graph_[np.int(row[0])]['level'] = -1 # will be modified later
-                    allTargets.append(np.int(row[0]))
+                    self.graph_[int(float(row[0]))]['params'] = currInteraction
+                    self.graph_[int(float(row[0]))]['regs'] = currParents
+                    self.graph_[int(float(row[0]))]['level'] = -1 # will be modified later
+                    allTargets.append(int(float(row[0])))
 
                     #if self.dyn_:
                     #    for b in range(self.nBins_):
                     #        binDict[b].append(gene(np.int(row[0]),'T', b))
             else:
                 for indRow, row in enumerate(reader):
-                    nRegs = np.int(np.float(row[1]))
+                    nRegs = int(float(row[1]))
                     ##################### Raise Error ##########################
                     if nRegs == 0:
                         print ("Error: a master regulator (#Regs = 0) appeared in input")
@@ -190,15 +190,15 @@ class sergio (object):
                     currInteraction = []
                     currParents = []
                     for regId, K, in zip(row[2: 2 + nRegs], row[2+nRegs : 2+2*nRegs]):
-                        currInteraction.append((np.int(np.float(regId)), np.float(K), shared_coop_state, 0)) # last zero shows half-response, it is modified in another method
-                        allRegs.append(np.int(np.float(regId)))
-                        currParents.append(np.int(np.float(regId)))
-                        self.graph_[np.int(np.float(regId))]['targets'].append(np.int(np.float(row[0])))
+                        currInteraction.append((int(float(regId)), float(K), shared_coop_state, 0)) # last zero shows half-response, it is modified in another method
+                        allRegs.append(int(float(regId)))
+                        currParents.append(int(float(regId)))
+                        self.graph_[int(float(regId))]['targets'].append(int(float(row[0])))
 
-                    self.graph_[np.int(np.float(row[0]))]['params'] = currInteraction
-                    self.graph_[np.int(np.float(row[0]))]['regs'] = currParents
-                    self.graph_[np.int(np.float(row[0]))]['level'] = -1 # will be modified later
-                    allTargets.append(np.int(np.float(row[0])))
+                    self.graph_[int(float(row[0]))]['params'] = currInteraction
+                    self.graph_[int(float(row[0]))]['regs'] = currParents
+                    self.graph_[int(float(row[0]))]['level'] = -1 # will be modified later
+                    allTargets.append(int(float(row[0])))
 
                     #if self.dyn_:
                     #    for b in range(self.nBins_):
@@ -215,7 +215,7 @@ class sergio (object):
                     sys.exit()
 
                 masterRegs.append(int(float(row[0])))
-                self.graph_[int(float(row[0]))]['rates'] = [np.float(i) for i in row[1:]]
+                self.graph_[int(float(row[0]))]['rates'] = [float(i) for i in row[1:]]
                 self.graph_[int(float(row[0]))]['regs'] = []
                 self.graph_[int(float(row[0]))]['level'] = -1
 
@@ -375,7 +375,7 @@ class sergio (object):
                     rate = 0
                     for interTuple in params:
                         meanExp = self.meanExpression[interTuple[0], bIdx]
-                        rate += np.abs(interTuple[1]) * self.hill_(meanExp, interTuple[3], interTuple[2], interTuple[1] < 0)
+                        rate += abs(interTuple[1]) * self.hill_(meanExp, interTuple[3], interTuple[2], interTuple[1] < 0)
 
                     g[bIdx].append_Conc(np.true_divide(rate, self.decayVector_[g[0].ID]))
 
@@ -385,21 +385,20 @@ class sergio (object):
         """
         type = bin_list[0].Type
 
-        if (type == 'MR'):
+        if type == 'MR':
             rates = self.graph_[bin_list[0].ID]['rates']
             return [rates[gb.binID] for gb in bin_list]
 
         else:
             params = self.graph_[bin_list[0].ID]['params']
-            Ks = [np.abs(t[1]) for t in params]
+            Ks = [abs(t[1]) for t in params]
             regIndices = [t[0] for t in params]
             binIndices = [gb.binID for gb in bin_list]
             currStep = bin_list[0].simulatedSteps_
-            lastLayerGenes = np.copy(self.level2verts_[level + 1])
+            lastLayerGenes = self.level2verts_[level + 1].copy()
             hillMatrix = np.zeros((len(regIndices), len(binIndices)))
 
             for tupleIdx, rIdx in enumerate(regIndices):
-		#print "Here"
                 regGeneLevel = self.gID_to_level_and_idx[rIdx][0]
                 regGeneIdx = self.gID_to_level_and_idx[rIdx][1]
                 regGene_allBins = self.level2verts_[regGeneLevel][regGeneIdx]
@@ -577,7 +576,7 @@ class sergio (object):
                         currRate = 0
                         for interTuple in params:
                             meanExp = self.meanExpression[interTuple[0], binID]
-                            currRate += np.abs(interTuple[1]) * self.hill_(meanExp, interTuple[3], interTuple[2], interTuple[1] < 0)
+                            currRate += abs(interTuple[1]) * self.hill_(meanExp, interTuple[3], interTuple[2], interTuple[1] < 0)
                             #if binID == 0 and g[0].ID == 0:
                                 #print meanExp
                                 #print interTuple[3]
@@ -642,13 +641,13 @@ class sergio (object):
         Retunrs a list of 1 * num_c_to_evolve prod rates
         """
         type = self.binDict[binID][gID].Type
-        if (type == 'MR'):
+        if type == 'MR':
             rates = self.graph_[gID]['rates']
             return [rates[binID] for i in range(num_c_to_evolve)]
 
         else:
             params = self.graph_[gID]['params']
-            Ks = [np.abs(t[1]) for t in params]
+            Ks = [abs(t[1]) for t in params]
             Ks = np.array(Ks)
             regIndices = [t[0] for t in params]
             hillMatrix = np.zeros((len(regIndices), num_c_to_evolve))
