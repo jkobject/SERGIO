@@ -9,59 +9,66 @@ import zipfile
 import random
 import logging
 
-def grn_from_v1(path, n = 2, decay = 0.8):
+
+def grn_from_v1(path, n=2, decay=0.8):
     """
     if set n = None, it's read from file
     """
     ret = GRN()
-    with open(path,'r') as f:
+    with open(path, "r") as f:
         for r in f.readlines():
-            r = r.split(',')
+            r = r.split(",")
             nInt = int(float(r[1]))
             tar = r[0]
-            regs = r[2:2+nInt]
-            ks = r[2+nInt : 2+2*nInt]
+            regs = r[2 : 2 + nInt]
+            ks = r[2 + nInt : 2 + 2 * nInt]
             ks = [float(i) for i in ks]
             if not n:
-                ns = r[2+2*nInt : 2+3*nInt]
+                ns = r[2 + 2 * nInt : 2 + 3 * nInt]
                 ns = [float(i) for i in ns]
             else:
                 ns = [n] * nInt
 
-            for currR,currK,currN in zip(regs,ks,ns):
-                reg = Gene(name = currR, decay = decay)
-                tar = Gene(name = tar, decay = decay)
-                currInter = SingleInteraction(reg = [reg], tar = tar, k = currK, h = None, n = currN)
+            for currR, currK, currN in zip(regs, ks, ns):
+                reg = Gene(name=currR, decay=decay)
+                tar = Gene(name=tar, decay=decay)
+                currInter = SingleInteraction(
+                    reg=[reg], tar=tar, k=currK, h=None, n=currN
+                )
                 ret.add_interaction(currInter)
     ret.setMRs()
     return ret
 
 
-def grn_from_file(path, parameterize = False, k_act = [1,5], k_rep = [-5,-1], n = 2, decay = 0.8):
-    names = ['index','reg','coop','tar','k','n','h','reg_decay','tar_decay']
-    net = pd.read_csv(path, header = 0, index_col = 0, names = names)
+def grn_from_file(
+    path, parameterize=False, k_act=[1, 5], k_rep=[-5, -1], n=2, decay=0.8
+):
+    names = ["index", "reg", "coop", "tar", "k", "n", "h", "reg_decay", "tar_decay"]
+    net = pd.read_csv(path, header=0, index_col=0, names=names)
     # it will hanadle it even if file does not contain k,n or h
 
     if parameterize:
         param = grnParam(k_act, k_rep, n, decay)
         net = parameterize_grn(net, param)
 
-
     ret = GRN()
-    for _,r in net.iterrows():
+    for _, r in net.iterrows():
         if r.coop:
-            raise ValueError('Cooperative interactions are not implemented yet') # TODO: implement multiple interactions
-        reg = Gene(name = str(r.reg), decay = r.reg_decay)
-        tar = Gene(name = str(r.tar), decay = r.tar_decay)
-        currInter = SingleInteraction(reg = [reg], tar = tar, k = r.k, h = r.h, n = r.n)
+            raise ValueError(
+                "Cooperative interactions are not implemented yet"
+            )  # TODO: implement multiple interactions
+        reg = Gene(name=str(r.reg), decay=r.reg_decay)
+        tar = Gene(name=str(r.tar), decay=r.tar_decay)
+        currInter = SingleInteraction(reg=[reg], tar=tar, k=r.k, h=r.h, n=r.n)
         ret.add_interaction(currInter)
 
     ret.setMRs()
     return ret
 
-def grn_from_human(nGenes = 400,k_act = 1,k_rep = -1,n = 2, decay = 0.8):
+
+def grn_from_human(nGenes=1000, k_act=1, k_rep=-1, n=2, decay=0.8, min_elem_per_tf=5):
     def download_network():
-        '''It checks if data exists, if not it downloads from https://regnetworkweb.org/download/RegulatoryDirections.zip'''
+        """It checks if data exists, if not it downloads from https://regnetworkweb.org/download/RegulatoryDirections.zip"""
         import os
         import ssl
         import urllib.request
@@ -70,12 +77,15 @@ def grn_from_human(nGenes = 400,k_act = 1,k_rep = -1,n = 2, decay = 0.8):
 
         if not os.path.exists(file_path):
             logging.info("File does not exist. Downloading...")
-            #Disable SSL verification, othwerwise it gives error
+            # Disable SSL verification, othwerwise it gives error
             context = ssl.create_default_context()
             context.check_hostname = False
             context.verify_mode = ssl.CERT_NONE
 
-            with urllib.request.urlopen(url, context=context) as u, open(file_path, "wb") as f:
+            with (
+                urllib.request.urlopen(url, context=context) as u,
+                open(file_path, "wb") as f,
+            ):
                 file_data = u.read()
                 f.write(file_data)
 
@@ -92,35 +102,54 @@ def grn_from_human(nGenes = 400,k_act = 1,k_rep = -1,n = 2, decay = 0.8):
     read edges
     loads the data into a pandas dataframe and clean up
     """
-    
+
     with zipfile.ZipFile(file_path, "r") as zip_file:
         with zip_file.open(file_name) as file:
-            tb = pd.read_csv(file, sep=" ",usecols=[0,1,2,3,4],names = ['#TF', 'ID', 'Target', 'ID.1','sign'],skiprows=1)
-    tb.replace({'-->':1,'--|':-1},inplace = True)
-    tb.drop(labels= tb.index[~tb.sign.isin([k_act,k_rep])],axis = 'index', inplace=True)
-    
+            tb = pd.read_csv(
+                file,
+                sep=" ",
+                usecols=[0, 1, 2, 3, 4],
+                names=["#TF", "ID", "Target", "ID.1", "sign"],
+                skiprows=1,
+            )
+    tfs = tb["#TF"].value_counts() > min_elem_per_tf
+    tb = tb[tb["#TF"].isin(tfs.index[tfs])]
+    tb.replace({"-->": 1, "--|": -1}, inplace=True)
+    tb.drop(labels=tb.index[~tb.sign.isin([k_act, k_rep])], axis="index", inplace=True)
+
     g = nx.DiGraph()
-    g.add_weighted_edges_from(tb[['ID','ID.1','sign']].values)
-    if nGenes>len(g.nodes()):
+    g.add_weighted_edges_from(tb[["#TF", "Target", "sign"]].values)
+    if nGenes > len(g.nodes()):
         nGenes = len(g.nodes())
-        warnings.warn('You want to sample '+str(nGenes)+' genes, but the full network contains '+str(len(g.nodes()+'. Sampling all genes available')))
+        warnings.warn(
+            "You want to sample "
+            + str(nGenes)
+            + " genes, but the full network contains "
+            + str(len(g.nodes()))
+            + ". Sampling all genes available"
+        )
 
     """
     sample genes
     Uses a method that starts from a node and follows links, it aims to return a connected network
     """
 
-    subset = _sample_network(G = g,nGenes=nGenes)
-    subgraph = nx.subgraph(g,subset).copy()
-    grn = grn_from_networkx(g = subgraph,parametrize=False)
-    return grn
+    subset = _sample_network(G=g, nGenes=nGenes)
+    subgraph = nx.subgraph(g, subset).copy()
+    return subgraph
 
-def grn_from_Ecoli(nGenes = 400, k_act = [1,5], k_rep = [-5,-1], n = 2, decay = 0.8):
+
+def grn_from_Ecoli(nGenes=400, k_act=[1, 5], k_rep=[-5, -1], n=2, decay=0.8):
     """
     read genes
     """
-    df = pd.read_csv('SERGIO/GRN/ref/EcoliNet.v1.txt', sep = '\t', names = ['reg','tar','score'], header = None)
-    edges = df[['reg','tar']].drop_duplicates()
+    df = pd.read_csv(
+        "SERGIO/GRN/ref/EcoliNet.v1.txt",
+        sep="\t",
+        names=["reg", "tar", "score"],
+        header=None,
+    )
+    edges = df[["reg", "tar"]].drop_duplicates()
 
     """
     remove cycles
@@ -146,16 +175,21 @@ def grn_from_Ecoli(nGenes = 400, k_act = [1,5], k_rep = [-5,-1], n = 2, decay = 
         ind += 1
 
     modified_edges = pd.DataFrame(modified_edges)
-    modified_edges.columns = ['index','reg','coop','tar']
+    modified_edges.columns = ["index", "reg", "coop", "tar"]
 
     """
     sample genes
     """
-    genes = modified_edges.reg.unique().flatten().tolist() + modified_edges.tar.unique().flatten().tolist()
+    genes = (
+        modified_edges.reg.unique().flatten().tolist()
+        + modified_edges.tar.unique().flatten().tolist()
+    )
     genes = np.unique(genes)
-    genes = np.random.choice(genes, nGenes, replace = False)
+    genes = np.random.choice(genes, nGenes, replace=False)
 
-    edges = modified_edges.loc[(modified_edges.reg.isin(genes)) & (modified_edges.tar.isin(genes))]
+    edges = modified_edges.loc[
+        (modified_edges.reg.isin(genes)) & (modified_edges.tar.isin(genes))
+    ]
 
     """
     parameterize
@@ -164,19 +198,22 @@ def grn_from_Ecoli(nGenes = 400, k_act = [1,5], k_rep = [-5,-1], n = 2, decay = 
     net = parameterize_grn(edges, param)
 
     ret = GRN()
-    for _,r in net.iterrows():
+    for _, r in net.iterrows():
         if r.coop:
-            raise ValueError('Cooperative interactions are not implemented yet') # TODO: implement multiple interactions
-        reg = Gene(name = str(r.reg), decay = r.reg_decay)
-        tar = Gene(name = str(r.tar), decay = r.tar_decay)
-        currInter = SingleInteraction(reg = [reg], tar = tar, k = r.k, h = r.h, n = r.n)
+            raise ValueError(
+                "Cooperative interactions are not implemented yet"
+            )  # TODO: implement multiple interactions
+        reg = Gene(name=str(r.reg), decay=r.reg_decay)
+        tar = Gene(name=str(r.tar), decay=r.tar_decay)
+        currInter = SingleInteraction(reg=[reg], tar=tar, k=r.k, h=r.h, n=r.n)
         ret.add_interaction(currInter)
 
     ret.setMRs()
     return ret
 
-def _sample_network(G,nGenes):
-    '''nGenes: size of the sample
+
+def _sample_network(G, nGenes):
+    """nGenes: size of the sample
 
     Sample a connected subset of nodes from a directed network using a random walk.
 
@@ -196,7 +233,7 @@ def _sample_network(G,nGenes):
         - The script uses a random walk starting from a random node to sample the subset, and may take some time to complete for large networks.
         - The sampling process is repeated with replacement until the desired number of nodes is reached, so the resulting subset may contain duplicate nodes.
         - The sampling process is biased towards nodes with a high degree, so the resulting subset may not be representative of the network as a whole.
-    '''
+    """
 
     # Initialize the subset
     subset = set()
@@ -248,8 +285,12 @@ def _sample_network(G,nGenes):
                     G.remove_edge(node, new_node)
 
     return subset
-def grn_from_networkx(g,k_act = [1,5], k_rep = [-5,-1],parametrize = False,hill_coef = 2., decay = 0.8):
-    '''
+
+
+def grn_from_networkx(
+    g, k_act=[1, 5], k_rep=[-5, -1], parametrize=False, hill_coef=2.0, decay=0.8
+):
+    """
     Function Name: grn_from_networkx
 
     Description:
@@ -266,43 +307,52 @@ def grn_from_networkx(g,k_act = [1,5], k_rep = [-5,-1],parametrize = False,hill_
     Returns:
 
     ret: A GRN() object containing the converted GRN.
-    '''
+    """
+
     def _remove_cycles(G):
-        #removing cycles
+        # removing cycles
         while True:
             try:
                 cycle = nx.find_cycle(G)
-                G.remove_edges_from([cycle[0]])#it removes only one link(the first) out of a cycle
+                G.remove_edges_from(
+                    [cycle[0]]
+                )  # it removes only one link(the first) out of a cycle
             except nx.exception.NetworkXNoCycle:
                 break
         return G
 
     ret = GRN()
-    G = g.copy()# I am making a copy because the input graph is modified ( in _remove_cycled, if parametrize==True, or if g is not weighted)
-    '''
+    G = g.copy()  # I am making a copy because the input graph is modified ( in _remove_cycled, if parametrize==True, or if g is not weighted)
+    """
     Removes cycles
-    '''
+    """
     G = _remove_cycles(G)
     if parametrize or not nx.is_weighted(G):
         n_edges = len(G.edges())
-        cond = np.random.uniform(size = n_edges) < 0.75 #sample True with prob 75% 
-        kRange = np.where(cond, np.array([k_act]*n_edges).T,np.array([k_rep]*n_edges).T)#sample k_act to True and k_rep
-        k = np.random.uniform(low = kRange[0], high = kRange[1])
-        reg,tar = zip(*list(g.edges()))
+        cond = np.random.uniform(size=n_edges) < 0.75  # sample True with prob 75%
+        kRange = np.where(
+            cond, np.array([k_act] * n_edges).T, np.array([k_rep] * n_edges).T
+        )  # sample k_act to True and k_rep
+        k = np.random.uniform(low=kRange[0], high=kRange[1])
+        reg, tar = zip(*list(g.edges()))
         G = nx.DiGraph()
-        G.add_weighted_edges_from(zip(reg,tar,k))#create a new networkx.DiGraph() with weighted edges
-        
-    for reg,tar,weight in G.edges(data = True):
-        k = weight['weight']# extract numerical value
-        reg = Gene(name = str(reg), decay = decay)
-        tar = Gene(name = str(tar), decay = decay)
-        currInter = SingleInteraction(reg = [reg], tar = tar, k = k, h = None, n = hill_coef)
+        G.add_weighted_edges_from(
+            zip(reg, tar, k)
+        )  # create a new networkx.DiGraph() with weighted edges
+
+    for reg, tar, weight in G.edges(data=True):
+        k = weight["weight"]  # extract numerical value
+        reg = Gene(name=str(reg), decay=decay)
+        tar = Gene(name=str(tar), decay=decay)
+        currInter = SingleInteraction(reg=[reg], tar=tar, k=k, h=None, n=hill_coef)
         ret.add_interaction(currInter)
 
     ret.setMRs()
     return ret
+
+
 def grn_random_graph(N):
-    '''N:number of nodes
+    """N:number of nodes
     Note that the number of nodes in the graph will likely be smaller than N
     Weights sampled from 2 uniform distributions.
     This is a Python function that generates a gene regulatory network (GRN) using the NetworkX library. Here is a breakdown of what the function does:
@@ -330,22 +380,24 @@ def grn_random_graph(N):
     14. Finally, the function converts the generated graph to a gene regulatory network using the `grn_from_networkx` function, which takes the generated graph as input and returns a GRN.
 
     The function returns the generated GRN.
-    '''
+    """
     weight_pos = 3
     weight_neg = -weight_pos
-    band=1
-    frac_pos = 0.5 #fraction of positive links over total
-    G = nx.generators.random_k_out_graph(n = N,k = 4,alpha = 0.9)
+    band = 1
+    frac_pos = 0.5  # fraction of positive links over total
+    G = nx.generators.random_k_out_graph(n=N, k=4, alpha=0.9)
     largest = max(nx.strongly_connected_components(G), key=len)
-    G = G.subgraph(largest).copy()#filter graph to maximum  SCC
-    G = nx.DiGraph(G)#remove multi links
-    M = len(G.edges())#n. of links
-    w1 = np.random.uniform(weight_neg-band,weight_neg+band,int(M*frac_pos))#sample weights from 2 uniform distributions
-    w2 = np.random.uniform(weight_pos-band,weight_pos+band,M-len(w1))
+    G = G.subgraph(largest).copy()  # filter graph to maximum  SCC
+    G = nx.DiGraph(G)  # remove multi links
+    M = len(G.edges())  # n. of links
+    w1 = np.random.uniform(
+        weight_neg - band, weight_neg + band, int(M * frac_pos)
+    )  # sample weights from 2 uniform distributions
+    w2 = np.random.uniform(weight_pos - band, weight_pos + band, M - len(w1))
     w = np.concatenate([w1, w2])
-    random.shuffle(w)#avoid having correlation in the position
+    random.shuffle(w)  # avoid having correlation in the position
     J = nx.adjacency_matrix(G)
     J.data = w
-    G = nx.from_scipy_sparse_matrix(J,create_using=nx.DiGraph())
+    G = nx.from_scipy_sparse_matrix(J, create_using=nx.DiGraph())
     grn = grn_from_networkx(G)
     return grn
