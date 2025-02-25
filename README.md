@@ -1,12 +1,14 @@
 
-# SERGIO v2 (Single-cell ExpRession of Genes In silicO)
+# SERGIO v2.2 (Single-cell ExpRession of Genes In silicO)
 
 V1: [![DOI](https://zenodo.org/badge/197455649.svg)](https://zenodo.org/badge/latestdoi/197455649)
 V1: [Paper](https://doi.org/10.1016/j.cels.2020.08.003)
-V1: Saurabh Sinha’s Lab, University of Illinois at Urbana-Champaign [Sinha Lab](https://www.sinhalab.net/sinha-s-home)
+V1 & V2: Saurabh Sinha’s Lab, University of Illinois at Urbana-Champaign [Sinha Lab](https://www.sinhalab.net/sinha-s-home)
 
+V2.1: by [@g-torr](https://github.com/g-torr)
+V2.2: by [@jkobject](https://github.com/jkobject)
 
-Developed by Payam Dibaeinia
+To work with 2.2 please git clone and run `generate_main.ipynb`
 
 ## Description
 SERGIO is a simulator for single-cell expression data guided by gene regulatory networks. SERGIO v2 is up to 100X faster than the v1 version. SERGIO v2 essentially simulates the same stochastic differential equations as v1 while provides users with additional functionalities.

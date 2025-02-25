@@ -1,108 +1,123 @@
 """
 @author: Payam Dibaeinia
 """
+
 from ._utils import getInterName
 import numpy as np
 import pandas as pd
 from collections import defaultdict
 from ._components import SingleInteraction
 
+
 class GRN(object):
     def __init__(self, **kwargs):
         self.attr_ = self._build_attr(**kwargs)
         self.mrs_found_ = False
 
-    def _build_attr(self,**kwargs):
+    def _build_attr(self, **kwargs):
         ret = {
-            'genes' : {},
-            'interactions' : {},
-            'mrs' : set(),
-            'level2gene' : defaultdict(list),
-            'maxLevel' : -1,
+            "genes": {},
+            "interactions": {},
+            "mrs": set(),
+            "level2gene": defaultdict(list),
+            "maxLevel": -1,
         }
         for k in kwargs:
-            ret[k] = {} if kwargs[k] == 'dict' else kwargs[k]
+            ret[k] = {} if kwargs[k] == "dict" else kwargs[k]
 
         return ret
 
     def setMRs(self):
-        '''
+        """
         This function gives the complementary of the set self.attr_['mrs'].
         This is due to the fact that the function _check_inter_endPoints stores into self.attr_['mrs'] the
         regulated genes, hence the master regulator are obtained as the difference with the entire gene set.
-        '''
+        """
         if not self.mrs_found_:
-            mrs = set(self.attr_['genes'].keys()) - self.attr_['mrs']
-            self.attr_['mrs'] = mrs
+            mrs = set(self.attr_["genes"].keys()) - self.attr_["mrs"]
+            self.attr_["mrs"] = mrs
             self.mrs_found_ = True
 
     def get_mrs(self):
-        return list(self.attr_['mrs'])
+        return list(self.attr_["mrs"])
 
     def _add_gene(self, gene):
-        if gene.name_ not in self.attr_['genes'].keys():
-            self.attr_['genes'][gene.name_] = gene
-            #self.attr_['mrs'].add(gene.name_)
+        if gene.name_ not in self.attr_["genes"].keys():
+            self.attr_["genes"][gene.name_] = gene
+            # self.attr_['mrs'].add(gene.name_)
             return gene
         else:
-            #self.attr_['mrs'].add(gene.name_)
-            return self.attr_['genes'][gene.name_]
+            # self.attr_['mrs'].add(gene.name_)
+            return self.attr_["genes"][gene.name_]
 
     def add_interaction(self, interaction):
         self._check_inter_endPoints(interaction)
-        if interaction.name_ not in self.attr_['interactions'].keys():
-            self.attr_['interactions'][interaction.name_] = interaction
-
+        if interaction.name_ not in self.attr_["interactions"].keys():
+            self.attr_["interactions"][interaction.name_] = interaction
 
     def _check_inter_endPoints(self, interaction):
         interaction.tar_ = self._add_gene(interaction.tar_)
-        #self.attr_['mrs'].remove(interaction.tar_.name_)
-        self.attr_['mrs'].add(interaction.tar_.name_)# beware the name  self.attr_['mrs'] is misleading, they are regulated genes. 
+        # self.attr_['mrs'].remove(interaction.tar_.name_)
+        self.attr_["mrs"].add(
+            interaction.tar_.name_
+        )  # beware the name  self.attr_['mrs'] is misleading, they are regulated genes.
         interaction.reg_ = [self._add_gene(g) for g in interaction.reg_]
 
-        interaction.tar_.regs += [interaction.reg_] #regs are added as list, regs of doubly interactions are added as lists of size > 1
+        interaction.tar_.regs += [
+            interaction.reg_
+        ]  # regs are added as list, regs of doubly interactions are added as lists of size > 1
 
         rList = interaction.reg_
-        name = getInterName(rList,interaction.tar_)
+        name = getInterName(rList, interaction.tar_)
         interaction.tar_.inInteractions[name] = interaction
 
         for g in interaction.reg_:
             g.tars += [interaction.tar_]
 
-
-    def init(self, mr_profile, update_half_resp = True):
-        for g in self.attr_['mrs']:
-            self.attr_['genes'][g].isMR_ = True
+    def init(self, mr_profile, update_half_resp=True):
+        for g in self.attr_["mrs"]:
+            self.attr_["genes"][g].isMR_ = True
         self._set_levels()
         self._set_MR_profile(mr_profile)
-        self._estimate_params(half_resp = update_half_resp)
+        self._estimate_params(half_resp=update_half_resp)
 
     def _set_levels(self):
         U = set()
         Z = set()
-        V = set([g for g in self.attr_['genes'].keys()])
+        V = set([g for g in self.attr_["genes"].keys()])
 
         currLayer = 0
         while U != V:
-            currVerts = set(filter(lambda v: set([g.name_ for g in self.attr_['genes'][v].tars]).issubset(Z), V-U))
+            currVerts = set(
+                filter(
+                    lambda v: set(
+                        [g.name_ for g in self.attr_["genes"][v].tars]
+                    ).issubset(Z),
+                    V - U,
+                )
+            )
 
             for v in currVerts:
-                self.attr_['genes'][v].level = currLayer
-                self.attr_["level2gene"][currLayer] += [self.attr_['genes'][v]]
+                self.attr_["genes"][v].level = currLayer
+                self.attr_["level2gene"][currLayer] += [self.attr_["genes"][v]]
                 U.add(v)
 
             currLayer += 1
             Z = Z.union(U)
 
-        self.attr_['maxLevel'] = currLayer - 1
+        self.attr_["maxLevel"] = currLayer - 1
 
     def _set_MR_profile(self, mrProfile):
         """
         mrProfile: is an instance of MR object (# TODO: )
         """
-        for mr_name in mrProfile.profile.keys():#Todo might be changed when MR object is implemented
-            assert(mr_name in self.attr_['mrs'])
-            self.attr_['genes'][mr_name].prod_rates_ = np.array(mrProfile.profile[mr_name]).flatten()
+        for mr_name in (
+            mrProfile.profile.keys()
+        ):  # Todo might be changed when MR object is implemented
+            assert mr_name in self.attr_["mrs"]
+            self.attr_["genes"][mr_name].prod_rates_ = np.array(
+                mrProfile.profile[mr_name]
+            ).flatten()
 
         self.nCellTypes_ = mrProfile.nTypes_
 
@@ -118,9 +133,10 @@ class GRN(object):
         """
         genes = self.attr_["level2gene"][level]
         for g in genes:
-            prod = g._calc_prod(cTypes = list(range(self.nCellTypes_)), regs_conc = 'ss') #np.arr of size No. cell types
+            prod = g._calc_prod(
+                cTypes=list(range(self.nCellTypes_)), regs_conc="ss"
+            )  # np.arr of size No. cell types
             g.ss_conc_ = prod / g.decay_
-
 
     def _estimate_half_response(self, level):
         """
@@ -140,21 +156,22 @@ class GRN(object):
                 else:
                     raise ValueError("not implemented")
 
-
     def _estimate_params(self, half_resp):
-        self._estimate_steady_state(level = self.attr_['maxLevel'])
-        for l in range(self.attr_['maxLevel'] - 1, -1, -1):
+        self._estimate_steady_state(level=self.attr_["maxLevel"])
+        for l in range(self.attr_["maxLevel"] - 1, -1, -1):
             if half_resp:
-                self._estimate_half_response(level = l)
+                self._estimate_half_response(level=l)
 
             try:
-                self._estimate_steady_state(level = l)
+                self._estimate_steady_state(level=l)
             except:
-                raise ValueError("Half response parameters are not defined. Consider setting update_half_resp = True in init.")
+                raise ValueError(
+                    "Half response parameters are not defined. Consider setting update_half_resp = True in init."
+                )
 
     def to_df(self, path):
         ret = []
-        for i in self.attr_['interactions'].values():
+        for i in self.attr_["interactions"].values():
             if len(i.reg_) > 1:
                 raise ValueError("coop regulations is not implemented")
             curr = [j.name_ for j in i.reg_]
@@ -162,11 +179,15 @@ class GRN(object):
             ret.append(curr)
 
         ret = pd.DataFrame(ret)
-        ret.columns = ['reg','tar','k','n','h']
-        ret.to_csv(path, header = True, index = True)
+        ret.columns = ["reg", "tar", "k", "n", "h"]
+        ret.to_csv(path, header=True, index=True)
+
     def to_networkx(self):
-        '''Convert GRN object to networkx.DiGraph() with weighted edges. Weight is the parameter k of the interaction'''
+        """Convert GRN object to networkx.DiGraph() with weighted edges. Weight is the parameter k of the interaction"""
         import networkx as nx
+
         G = nx.DiGraph()
-        G.add_weighted_edges_from([el.split('-')+[v.k_] for el,v in self.attr_['interactions'].items()])
+        G.add_weighted_edges_from(
+            [el.split("-") + [v.k_] for el, v in self.attr_["interactions"].items()]
+        )
         return G
