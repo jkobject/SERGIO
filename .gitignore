@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.pkl
 # C extensions
 *.so
 
@@ -102,3 +102,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+.dist
+.build
+sergio_scSim.egg-info
+Untitled.ipynb
